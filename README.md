@@ -1,11 +1,17 @@
 # ZenTao MCP Server (API V1.0)
 
-基于 `TypeScript + Node.js + @modelcontextprotocol/sdk` 的禅道 MCP 服务，支持：
+基于 `TypeScript + Node.js + @modelcontextprotocol/sdk` 的禅道 MCP 服务，完整覆盖禅道 API v1 Bug 模块 9 个接口：
 
 - 登录初始化（`initZentao`）
 - 查看产品（`getProducts`）
-- 查看我的 bug（`getMyBugs`）
+- 查看我的 bug（`getMyBugs`，指派给我的，跨产品）
+- 查看产品 bug 列表（`getProductBugs`，官方 `GET /products/{id}/bugs`，单页）
 - 查看 bug 详情（`getBugDetail`）
+- 创建 bug（`createBug`）
+- 修改 bug（`updateBug`）
+- 删除 bug（`deleteBug`，需 `confirm: true`）
+- 确认 bug（`confirmBug`）
+- 关闭 bug（`closeBug`）
 - 解决 bug（`resolveBug`）
 - 激活 bug（`activateBug`，重新打开）
 
@@ -20,20 +26,20 @@ cp .env.example .env
 
 ## 2. 从 npm / npx 运行（其它机器推荐）
 
-npm 包名：**`@wudidada/zentao-mcp-server`**（作用域包；可执行命令 **`zentao-mcp-server`**）。
+npm 包名：**`@kerinlin/zentao-mcp-server`**（作用域包；可执行命令 **`zentao-mcp-server`**）。
 
 要求：**Node.js >= 20**。Linux/macOS 建议安装系统 **`curl`**（默认 HTTP 后端为 `curl`）。
 
 ### 2.1 命令行试跑
 
 ```bash
-npx -y @wudidada/zentao-mcp-server
+npx -y @kerinlin/zentao-mcp-server
 ```
 
 HTTP 模式示例：
 
 ```bash
-MCP_TRANSPORT=http npx -y @wudidada/zentao-mcp-server
+MCP_TRANSPORT=http npx -y @kerinlin/zentao-mcp-server
 ```
 
 ### 2.2 Cursor `mcp.json`（stdio + 环境变量）
@@ -45,7 +51,7 @@ MCP_TRANSPORT=http npx -y @wudidada/zentao-mcp-server
   "mcpServers": {
     "zentao": {
       "command": "npx",
-      "args": ["-y", "@wudidada/zentao-mcp-server"],
+      "args": ["-y", "@kerinlin/zentao-mcp-server"],
       "env": {
         "ZENTAO_BASE_URL": "http://your-host/zentao/api.php/v1",
         "ZENTAO_ACCOUNT": "your_account",
@@ -58,7 +64,7 @@ MCP_TRANSPORT=http npx -y @wudidada/zentao-mcp-server
 }
 ```
 
-修改配置后请**完全重启 Cursor**。也可将 `args` 中的包名改为固定版本，例如 `@wudidada/zentao-mcp-server@1.0.1`。
+修改配置后请**完全重启 Cursor**。也可将 `args` 中的包名改为固定版本，例如 `@kerinlin/zentao-mcp-server@1.0.1`。
 
 ### 2.3 维护者：发布到 npm
 
@@ -70,7 +76,7 @@ npm publish --access public
 
 首次发布前需 `npm login`，并确保 `package.json` 中 `version` 未被占用。
 
-源码仓库：<https://github.com/wudidada/zentao-mcp-server>
+源码仓库：<https://github.com/Kerinlin/zentao-mcp-server>
 
 ## 3. 启动方式
 
@@ -114,10 +120,49 @@ npm test
 
 - `status?: "active" | "resolved" | "closed" | "all"`（默认 `active`）
 - `productId?: number`
+- 语义：指派给我的 bug；与 `getProductBugs`（产品下全部 bug）不同
+
+### getProductBugs
+
+- `productId: number`（必填）
+- `status?: "active" | "resolved" | "closed" | "all"`（**无默认**；`all`/不传则不按状态过滤）
+- `page?: number`
+- `limit?: number`
+- 官方路径 `GET /products/{id}/bugs`；**单页返回，不自动翻页**
 
 ### getBugDetail
 
 - `bugId: number`
+
+### createBug
+
+- `productId: number`
+- `title: string` / `severity: number` / `pri: number` / `type: BugType`（必填）
+- 可选：`branch` / `module` / `execution` / `keywords` / `os` / `browser` / `steps` / `task` / `story` / `deadline` / `openedBuild`
+- `openedBuild?: string | string[]`（**不传则默认 `["trunk"]`**）
+- `type` 枚举：`codeerror | config | install | security | performance | standard | automation | designdefect | others`
+
+### updateBug
+
+- `bugId: number`
+- `title` / `severity` / `pri` / `type`（必填，按文档全量提交；建议先 `getBugDetail`）
+- 其余可选字段同 `createBug`；未传 `openedBuild` 时**不**默认 trunk
+
+### deleteBug
+
+- `bugId: number`
+- `confirm: true`（**字面量 true**；删除不可逆，缺省或 `false` 均拒绝）
+
+### confirmBug
+
+- `bugId: number`
+- `assignedTo?: string` / `type?: BugType` / `mailto?: string[]` / `comment?: string` / `pri?: number`
+
+### closeBug
+
+- `bugId: number`
+- `comment?: string`
+- 成功后校验 `status === "closed"`，否则抛错
 
 ### activateBug
 
@@ -129,7 +174,7 @@ npm test
 ### resolveBug
 
 - `bugId: number`
-- `resolution.resolution: "fixed" | "notrepro" | "duplicate" | "bydesign" | "willnotfix" | "tostory" | "external"`
+- `resolution.resolution: "fixed" | "notrepro" | "duplicate" | "bydesign" | "willnotfix" | "tostory" | "external" | "postponed"`
 - `resolution.resolvedBuild?: string`（**当解决方案为 `fixed` 时，服务端固定提交 `trunk`**，忽略该字段，避免部分禅道网页端显示异常）
 - `resolution.duplicateBug?: number`（当 `resolution=duplicate` 时必填）
 - `resolution.comment?: string`
@@ -164,7 +209,10 @@ src/
 
 ## 8. 注意事项
 
-- 当前实现按禅道 API V1.0 常见 REST 路径封装（`/tokens`、`/bugs`、`/products`）。
+- 当前实现按禅道 API V1.0 常见 REST 路径封装（`/tokens`、`/bugs`、`/products`、`/products/{id}/bugs`）。
 - **解决 Bug**：官方 v1 接口为 **`POST /bugs/{id}/resolve`**（不是 PUT）。若误用 PUT，可能出现 HTTP 成功但禅道未真正更新状态的情况。
+- **关闭 Bug**：`POST /bugs/{id}/close` 后会二次校验 `status=closed`。
+- **删除 Bug**：必须 `confirm: true`；操作不可逆，请谨慎。
+- **列表语义**：`getMyBugs` = 指派给我；`getProductBugs` = 产品下全部（官方路径、单页）。
 - 如果你的禅道实例路径或鉴权字段有差异，可在 `src/adapters/zentaoApiV1.ts` 适配。
 

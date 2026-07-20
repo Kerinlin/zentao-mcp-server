@@ -2,18 +2,30 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AuthError, ValidationError } from "../errors.js";
 import {
   activateBugSchema,
+  closeBugSchema,
+  confirmBugSchema,
+  createBugSchema,
+  deleteBugSchema,
   getBugDetailSchema,
   getMyBugsSchema,
+  getProductBugsSchema,
   initZentaoSchema,
   mcpInput,
   resolveBugSchema,
+  updateBugSchema,
 } from "../schemas/toolSchemas.js";
 import type { AppContext } from "../server/context.js";
 import { runActivateBugTool } from "./activateBug.js";
+import { runCloseBugTool } from "./closeBug.js";
+import { runConfirmBugTool } from "./confirmBug.js";
+import { runCreateBugTool } from "./createBug.js";
+import { runDeleteBugTool } from "./deleteBug.js";
 import { runGetBugDetailTool } from "./getBugDetail.js";
 import { runGetMyBugsTool } from "./getMyBugs.js";
+import { runGetProductBugsTool } from "./getProductBugs.js";
 import { runInitZentaoTool } from "./initZentao.js";
 import { runResolveBugTool } from "./resolveBug.js";
+import { runUpdateBugTool } from "./updateBug.js";
 import { failure, success } from "./toolResult.js";
 
 export function registerZentaoTools(server: McpServer, context: AppContext): void {
@@ -61,7 +73,7 @@ export function registerZentaoTools(server: McpServer, context: AppContext): voi
   server.registerTool(
     "getMyBugs",
     {
-      description: "按状态与产品筛选我的 bug 列表。",
+      description: "按状态与产品筛选指派给我的 bug 列表（跨产品聚合；非官方产品路径）。",
       inputSchema: mcpInput.getMyBugs,
       annotations: { readOnlyHint: true },
     },
@@ -76,6 +88,25 @@ export function registerZentaoTools(server: McpServer, context: AppContext): voi
           },
           "我的 Bug 列表",
         );
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "getProductBugs",
+    {
+      description:
+        "获取指定产品的 Bug 列表（官方路径 GET /products/{id}/bugs）。单页返回，不自动翻页；可用 page/limit 翻页。与 getMyBugs（指派给我的）语义不同。",
+      inputSchema: mcpInput.getProductBugs,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        const payload = getProductBugsSchema.parse(input);
+        const result = await runGetProductBugsTool(context, payload);
+        return success(result, `产品 #${payload.productId} Bug 列表`);
       } catch (error) {
         return failure(error);
       }
@@ -101,9 +132,98 @@ export function registerZentaoTools(server: McpServer, context: AppContext): voi
   );
 
   server.registerTool(
+    "createBug",
+    {
+      description:
+        "在指定产品下创建 Bug（POST /products/{id}/bugs）。必填 title/severity/pri/type；openedBuild 未传时默认 [\"trunk\"]。",
+      inputSchema: mcpInput.createBug,
+    },
+    async (input) => {
+      try {
+        const payload = createBugSchema.parse(input);
+        const detail = await runCreateBugTool(context, payload);
+        return success(detail, `Bug #${detail.id ?? "?"} 已创建`);
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "updateBug",
+    {
+      description:
+        "修改 Bug（PUT /bugs/{id}）。按文档强制提交 title/severity/pri/type；建议先 getBugDetail 再改。",
+      inputSchema: mcpInput.updateBug,
+    },
+    async (input) => {
+      try {
+        const payload = updateBugSchema.parse(input);
+        const detail = await runUpdateBugTool(context, payload);
+        return success(detail, `Bug #${payload.bugId} 已更新`);
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "deleteBug",
+    {
+      description:
+        "删除 Bug（DELETE /bugs/{id}，不可逆）。必须显式传入 confirm: true，否则拒绝执行。",
+      inputSchema: mcpInput.deleteBug,
+    },
+    async (input) => {
+      try {
+        const payload = deleteBugSchema.parse(input);
+        const result = await runDeleteBugTool(context, payload);
+        return success(result, `Bug #${payload.bugId} 已删除`);
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "confirmBug",
+    {
+      description: "确认 Bug（POST /bugs/{id}/confirm）。可选指派、类型、抄送、备注、优先级。",
+      inputSchema: mcpInput.confirmBug,
+    },
+    async (input) => {
+      try {
+        const payload = confirmBugSchema.parse(input);
+        const detail = await runConfirmBugTool(context, payload);
+        return success(detail, `Bug #${payload.bugId} 已确认`);
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "closeBug",
+    {
+      description: "关闭 Bug（POST /bugs/{id}/close）。成功后校验 status=closed。",
+      inputSchema: mcpInput.closeBug,
+    },
+    async (input) => {
+      try {
+        const payload = closeBugSchema.parse(input);
+        const detail = await runCloseBugTool(context, payload);
+        return success(detail, `Bug #${payload.bugId} 已关闭`);
+      } catch (error) {
+        return failure(error);
+      }
+    },
+  );
+
+  server.registerTool(
     "resolveBug",
     {
-      description: "提交 Bug 解决动作（fixed/notrepro/duplicate/...）。",
+      description:
+        "提交 Bug 解决动作（fixed/notrepro/duplicate/bydesign/willnotfix/tostory/external/postponed）。",
       inputSchema: mcpInput.resolveBug,
     },
     async (input) => {

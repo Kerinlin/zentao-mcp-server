@@ -7,7 +7,15 @@ import { logger } from "../logger.js";
 import { curlRequestJson } from "./curlHttp.js";
 import type {
   ActivateBugPayload,
+  BugWriteFields,
+  CloseBugPayload,
+  ConfirmBugPayload,
+  CreateBugPayload,
+  DeleteBugResult,
+  ProductBugsQuery,
+  ProductBugsResult,
   ResolveBugPayload,
+  UpdateBugPayload,
   ZentaoAuthSession,
   ZentaoBug,
   ZentaoBugDetail,
@@ -198,6 +206,118 @@ export class ZentaoApiV1Adapter {
     });
   }
 
+  /** 禅道 API v1：GET /products/{id}/bugs（单页，不自动翻页） */
+  public async getProductBugs(productId: number, query: ProductBugsQuery = {}): Promise<ProductBugsResult> {
+    return this.withAuthRequest(async () => {
+      const params: Record<string, unknown> = {};
+      if (query.page !== undefined) {
+        params.page = query.page;
+      }
+      if (query.limit !== undefined) {
+        params.limit = query.limit;
+      }
+      if (query.status && query.status !== "all") {
+        params.status = query.status;
+      }
+
+      const data = await this.request<PaginatedList<ZentaoBug> | ZentaoBug[]>({
+        method: "GET",
+        url: `/products/${productId}/bugs`,
+        params: Object.keys(params).length > 0 ? params : undefined,
+      });
+
+      if (Array.isArray(data)) {
+        return {
+          page: query.page ?? 1,
+          total: data.length,
+          limit: query.limit ?? data.length,
+          bugs: data.map((bug) => this.normalizeBug(bug)),
+        };
+      }
+
+      const bugs = (data.bugs ?? []).map((bug) => this.normalizeBug(bug));
+      return {
+        page: typeof data.page === "number" ? data.page : (query.page ?? 1),
+        total: typeof data.total === "number" ? data.total : bugs.length,
+        limit: typeof data.limit === "number" ? data.limit : (query.limit ?? bugs.length),
+        bugs,
+      };
+    });
+  }
+
+  /** 禅道 API v1：POST /products/{id}/bugs */
+  public async createBug(productId: number, payload: CreateBugPayload): Promise<ZentaoBugDetail> {
+    return this.withAuthRequest(async () => {
+      const body = this.buildBugWriteRequestBody(payload, { defaultOpenedBuild: true });
+      return this.request<ZentaoBugDetail>({
+        method: "POST",
+        url: `/products/${productId}/bugs`,
+        data: body,
+      });
+    });
+  }
+
+  /** 禅道 API v1：PUT /bugs/{id} */
+  public async updateBug(bugId: number, payload: UpdateBugPayload): Promise<ZentaoBugDetail> {
+    return this.withAuthRequest(async () => {
+      const body = this.buildBugWriteRequestBody(payload, { defaultOpenedBuild: false });
+      return this.request<ZentaoBugDetail>({
+        method: "PUT",
+        url: `/bugs/${bugId}`,
+        data: body,
+      });
+    });
+  }
+
+  /** 禅道 API v1：DELETE /bugs/{id}（不可逆，确认门闩在 schema 层） */
+  public async deleteBug(bugId: number): Promise<DeleteBugResult> {
+    return this.withAuthRequest(() =>
+      this.request<DeleteBugResult>({
+        method: "DELETE",
+        url: `/bugs/${bugId}`,
+      }),
+    );
+  }
+
+  /** 禅道 API v1：POST /bugs/{id}/confirm */
+  public async confirmBug(bugId: number, payload: ConfirmBugPayload = {}): Promise<ZentaoBugDetail> {
+    return this.withAuthRequest(async () => {
+      const body = this.buildConfirmRequestBody(payload);
+      return this.request<ZentaoBugDetail>({
+        method: "POST",
+        url: `/bugs/${bugId}/confirm`,
+        data: body,
+      });
+    });
+  }
+
+  /** 禅道 API v1：POST /bugs/{id}/close */
+  public async closeBug(bugId: number, payload: CloseBugPayload = {}): Promise<ZentaoBugDetail> {
+    return this.withAuthRequest(async () => {
+      const body = this.buildCloseRequestBody(payload);
+      const data = await this.request<ZentaoBugDetail>({
+        method: "POST",
+        url: `/bugs/${bugId}/close`,
+        data: body,
+      });
+
+      if (this.extractStatus(data) === "closed") {
+        return data;
+      }
+
+      const fresh = await this.getBugDetail(bugId);
+      if (this.extractStatus(fresh) === "closed") {
+        return fresh;
+      }
+
+      throw new RemoteApiError(
+        `禅道接口已返回 200，但 Bug #${bugId} 仍未关闭（当前 status=${String(this.extractStatus(fresh) ?? fresh.status)}）。请检查权限或该 Bug 是否允许关闭。`,
+        200,
+        fresh,
+      );
+    });
+  }
+
   /** 禅道 v1 文档要求部分字段；缺省时给常见默认值以提高成功率 */
   private buildResolveRequestBody(payload: ResolveBugPayload): Record<string, unknown> {
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -239,17 +359,114 @@ export class ZentaoApiV1Adapter {
       body.comment = payload.comment;
     }
 
-    let builds: string[];
-    if (payload.openedBuild === undefined) {
-      builds = ["trunk"];
-    } else if (Array.isArray(payload.openedBuild)) {
-      builds = payload.openedBuild.filter((b) => b.trim() !== "");
-    } else {
-      builds = payload.openedBuild.trim() === "" ? [] : [payload.openedBuild.trim()];
-    }
-    body.openedBuild = builds.length > 0 ? builds : ["trunk"];
+    body.openedBuild = this.normalizeOpenedBuild(payload.openedBuild, true);
 
     return body;
+  }
+
+  private buildBugWriteRequestBody(
+    payload: BugWriteFields,
+    options: { defaultOpenedBuild: boolean },
+  ): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      title: payload.title,
+      severity: payload.severity,
+      pri: payload.pri,
+      type: payload.type,
+    };
+
+    const optionalNumbers = ["branch", "module", "execution", "task", "story"] as const;
+    for (const key of optionalNumbers) {
+      if (payload[key] !== undefined) {
+        body[key] = payload[key];
+      }
+    }
+
+    const optionalStrings = ["keywords", "os", "browser", "steps", "deadline"] as const;
+    for (const key of optionalStrings) {
+      if (payload[key] !== undefined) {
+        body[key] = payload[key];
+      }
+    }
+
+    if (payload.openedBuild !== undefined) {
+      body.openedBuild = this.normalizeOpenedBuild(payload.openedBuild, false);
+    } else if (options.defaultOpenedBuild) {
+      body.openedBuild = ["trunk"];
+    }
+
+    return body;
+  }
+
+  private buildConfirmRequestBody(payload: ConfirmBugPayload): Record<string, unknown> {
+    const body: Record<string, unknown> = {};
+
+    if (payload.assignedTo !== undefined && payload.assignedTo.trim() !== "") {
+      body.assignedTo = payload.assignedTo.trim();
+    }
+    if (payload.type !== undefined) {
+      body.type = payload.type;
+    }
+    if (payload.mailto !== undefined && payload.mailto.length > 0) {
+      body.mailto = payload.mailto;
+    }
+    if (payload.comment !== undefined && payload.comment !== "") {
+      body.comment = payload.comment;
+    }
+    if (payload.pri !== undefined) {
+      body.pri = payload.pri;
+    }
+
+    return body;
+  }
+
+  private buildCloseRequestBody(payload: CloseBugPayload): Record<string, unknown> {
+    const body: Record<string, unknown> = {};
+    if (payload.comment !== undefined && payload.comment !== "") {
+      body.comment = payload.comment;
+    }
+    return body;
+  }
+
+  private normalizeOpenedBuild(
+    openedBuild: string | string[] | undefined,
+    defaultToTrunk: boolean,
+  ): string[] {
+    if (openedBuild === undefined) {
+      return defaultToTrunk ? ["trunk"] : [];
+    }
+    const builds = Array.isArray(openedBuild)
+      ? openedBuild.filter((b) => b.trim() !== "")
+      : openedBuild.trim() === ""
+        ? []
+        : [openedBuild.trim()];
+    if (builds.length === 0 && defaultToTrunk) {
+      return ["trunk"];
+    }
+    return builds;
+  }
+
+  /** 兼容 list 接口 status 为 { code, name } 对象的形态 */
+  private extractStatus(bug: { status?: unknown } | null | undefined): string | undefined {
+    if (!bug || bug.status === undefined || bug.status === null) {
+      return undefined;
+    }
+    if (typeof bug.status === "string") {
+      return bug.status;
+    }
+    if (typeof bug.status === "object" && bug.status !== null && "code" in bug.status) {
+      const code = (bug.status as { code?: unknown }).code;
+      return code === undefined || code === null ? undefined : String(code);
+    }
+    return String(bug.status);
+  }
+
+  private normalizeBug(bug: ZentaoBug): ZentaoBug {
+    const status = this.extractStatus(bug);
+    if (status === undefined || status === bug.status) {
+      return bug;
+    }
+    return { ...bug, status };
   }
 
   /**

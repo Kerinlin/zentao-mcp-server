@@ -1,5 +1,5 @@
 {
-  "name": "@wudidada/zentao-mcp-server",
+  "name": "@kerinlin/zentao-mcp-server",
   "version": "1.0.1",
   "description": "ZenTao API V1.0 MCP Server（禅道 MCP：登录、Bug 查询/解决/激活等）",
   "main": "dist/index.js",
@@ -36,12 +36,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wudidada/zentao-mcp-server.git"
+    "url": "git+https://github.com/Kerinlin/zentao-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/wudidada/zentao-mcp-server/issues"
+    "url": "https://github.com/Kerinlin/zentao-mcp-server/issues"
   },
-  "homepage": "https://github.com/wudidada/zentao-mcp-server#readme",
+  "homepage": "https://github.com/Kerinlin/zentao-mcp-server#readme",
   "publishConfig": {
     "access": "public"
   },
