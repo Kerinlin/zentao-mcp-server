@@ -24,34 +24,56 @@ cp .env.example .env
 
 请在 `.env` 中配置禅道地址与鉴权信息（推荐在运行时通过 `initZentao` 传入账号密码，不在文件中存明文）。
 
-## 2. 从 npm / npx 运行（其它机器推荐）
+## 2. 安装方式
 
-npm 包名：**`@kerin/zentao-mcp-server`**（作用域包；可执行命令 **`zentao-mcp-server`**）。
+### 2.1 无需 Node 环境（推荐最终用户）
 
-要求：**Node.js >= 20**。Linux/macOS 建议安装系统 **`curl`**（默认 HTTP 后端为 `curl`）。
+下载预编译二进制，**无需安装 Node.js**：
 
-### 2.1 命令行试跑
-
+**macOS (Apple Silicon M1/M2/M3)**：
 ```bash
-npx -y @kerin/zentao-mcp-server
+curl -L https://github.com/Kerinlin/zentao-mcp-server/releases/latest/download/zentao-mcp-server-darwin-arm64 -o zentao-mcp-server
+chmod +x zentao-mcp-server
 ```
 
-HTTP 模式示例：
-
+**macOS (Intel)**：
 ```bash
-MCP_TRANSPORT=http npx -y @kerin/zentao-mcp-server
+curl -L https://github.com/Kerinlin/zentao-mcp-server/releases/latest/download/zentao-mcp-server-darwin-x64 -o zentao-mcp-server
+chmod +x zentao-mcp-server
 ```
 
-### 2.2 Cursor `mcp.json`（stdio + 环境变量）
+**Linux (x64)**：
+```bash
+curl -L https://github.com/Kerinlin/zentao-mcp-server/releases/latest/download/zentao-mcp-server-linux-x64 -o zentao-mcp-server
+chmod +x zentao-mcp-server
+```
 
-在项目或用户目录下的 `.cursor/mcp.json` 中配置，例如：
+**Linux (ARM64)**：
+```bash
+curl -L https://github.com/Kerinlin/zentao-mcp-server/releases/latest/download/zentao-mcp-server-linux-arm64 -o zentao-mcp-server
+chmod +x zentao-mcp-server
+```
 
+**Windows**：
+```powershell
+# PowerShell
+Invoke-WebRequest -Uri "https://github.com/Kerinlin/zentao-mcp-server/releases/latest/download/zentao-mcp-server-windows-x64.exe" -OutFile "zentao-mcp-server.exe"
+```
+
+**验证下载**（可选）：
+```bash
+# 下载对应的 .sha256 文件验证
+shasum -a 256 -c zentao-mcp-server-darwin-arm64.sha256
+```
+
+**MCP 客户端配置**（以 Claude Code 为例）：
 ```json
 {
   "mcpServers": {
     "zentao": {
-      "command": "npx",
-      "args": ["-y", "@kerin/zentao-mcp-server"],
+      "type": "stdio",
+      "command": "/absolute/path/to/zentao-mcp-server",
+      "args": [],
       "env": {
         "ZENTAO_BASE_URL": "http://your-host/zentao/api.php/v1",
         "ZENTAO_ACCOUNT": "your_account",
@@ -64,7 +86,48 @@ MCP_TRANSPORT=http npx -y @kerin/zentao-mcp-server
 }
 ```
 
-修改配置后请**完全重启 Cursor**。也可将 `args` 中的包名改为固定版本，例如 `@kerin/zentao-mcp-server@1.1.1`。
+### 2.2 使用 npm / npx（已有 Node 环境）
+
+npm 包名：**`@kerin/zentao-mcp-server`**（作用域包；可执行命令 **`zentao-mcp-server`**）。
+
+要求：**Node.js >= 20**。Linux/macOS 建议安装系统 **`curl`**（默认 HTTP 后端为 `curl`）。
+
+**命令行试跑**：
+```bash
+npx -y @kerin/zentao-mcp-server
+```
+
+**全局安装**：
+```bash
+npm install -g @kerin/zentao-mcp-server
+zentao-mcp-server
+```
+
+**HTTP 模式**：
+```bash
+MCP_TRANSPORT=http npx -y @kerin/zentao-mcp-server
+```
+
+**MCP 客户端配置**（npx 方式）：
+```json
+{
+  "mcpServers": {
+    "zentao": {
+      "command": "npx",
+      "args": ["-y", "@kerin/zentao-mcp-server@1.1.1"],
+      "env": {
+        "ZENTAO_BASE_URL": "http://your-host/zentao/api.php/v1",
+        "ZENTAO_ACCOUNT": "your_account",
+        "ZENTAO_PASSWORD": "your_password",
+        "ZENTAO_HTTP_BACKEND": "curl",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+修改配置后请**完全重启 Cursor / Claude Code**。
 
 ### 2.3 维护者：发布到 npm
 
@@ -75,6 +138,21 @@ npm publish --access public
 ```
 
 首次发布前需 `npm login`，并确保 `package.json` 中 `version` 未被占用。
+
+### 2.4 维护者：构建多平台二进制
+
+```bash
+# 安装 Bun
+curl -fsSL https://bun.sh/install | bash
+
+# 构建所有平台
+npm run build:binary:all
+
+# 产物在 dist/ 目录
+ls -lh dist/zentao-mcp-server-*
+```
+
+**GitHub Actions 自动构建**：推送 `v*` tag 时会自动构建并上传到 Release。
 
 源码仓库：<https://github.com/Kerinlin/zentao-mcp-server>
 

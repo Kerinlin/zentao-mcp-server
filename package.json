@@ -1,6 +1,6 @@
 {
   "name": "@kerin/zentao-mcp-server",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "ZenTao API V1.0 MCP Server（禅道 MCP：Bug 全量接口，登录/查询/创建/修改/删除/确认/关闭/解决/激活）",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,6 +14,9 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:bundle": "bun build src/index.ts --outfile dist/bundle.js --target node --format esm",
+    "build:binary": "npm run build:bundle && bun build dist/bundle.js --compile --outfile zentao-mcp-server --target bun",
+    "build:binary:all": "npm run build:bundle && bun build dist/bundle.js --compile --outfile dist/zentao-mcp-server-darwin-arm64 --target bun-darwin-arm64 && bun build dist/bundle.js --compile --outfile dist/zentao-mcp-server-darwin-x64 --target bun-darwin-x64 && bun build dist/bundle.js --compile --outfile dist/zentao-mcp-server-linux-x64 --target bun-linux-x64 && bun build dist/bundle.js --compile --outfile dist/zentao-mcp-server-linux-arm64 --target bun-linux-arm64 && bun build dist/bundle.js --compile --outfile dist/zentao-mcp-server-windows-x64.exe --target bun-windows-x64",
     "prepublishOnly": "npm run build",
     "dev": "tsx src/index.ts",
     "start:stdio": "tsx src/server/stdio.ts",

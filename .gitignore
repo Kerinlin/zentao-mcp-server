@@ -36,3 +36,9 @@ temp/
 
 # Vitest
 .vitest/
+
+# Bun 本地编译产物（正式多平台产物在 dist/，且 dist/ 已忽略）
+/zentao-mcp-server
+/zentao-mcp-server-test
+/zentao-mcp-server-*
+!/zentao-mcp-server-*.md
