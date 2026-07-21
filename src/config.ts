@@ -1,7 +1,8 @@
 import dotenv from "dotenv";
 import { z } from "zod";
 
-dotenv.config();
+// quiet: 禁止 dotenv@17 向 stdout 打印 “injected env”，否则污染 MCP stdio
+dotenv.config({ quiet: true });
 
 const envSchema = z.object({
   ZENTAO_BASE_URL: z.string().url().optional(),

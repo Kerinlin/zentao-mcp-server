@@ -26,20 +26,20 @@ cp .env.example .env
 
 ## 2. 从 npm / npx 运行（其它机器推荐）
 
-npm 包名：**`@kerinlin/zentao-mcp-server`**（作用域包；可执行命令 **`zentao-mcp-server`**）。
+npm 包名：**`@kerin/zentao-mcp-server`**（作用域包；可执行命令 **`zentao-mcp-server`**）。
 
 要求：**Node.js >= 20**。Linux/macOS 建议安装系统 **`curl`**（默认 HTTP 后端为 `curl`）。
 
 ### 2.1 命令行试跑
 
 ```bash
-npx -y @kerinlin/zentao-mcp-server
+npx -y @kerin/zentao-mcp-server
 ```
 
 HTTP 模式示例：
 
 ```bash
-MCP_TRANSPORT=http npx -y @kerinlin/zentao-mcp-server
+MCP_TRANSPORT=http npx -y @kerin/zentao-mcp-server
 ```
 
 ### 2.2 Cursor `mcp.json`（stdio + 环境变量）
@@ -51,7 +51,7 @@ MCP_TRANSPORT=http npx -y @kerinlin/zentao-mcp-server
   "mcpServers": {
     "zentao": {
       "command": "npx",
-      "args": ["-y", "@kerinlin/zentao-mcp-server"],
+      "args": ["-y", "@kerin/zentao-mcp-server"],
       "env": {
         "ZENTAO_BASE_URL": "http://your-host/zentao/api.php/v1",
         "ZENTAO_ACCOUNT": "your_account",
@@ -64,7 +64,7 @@ MCP_TRANSPORT=http npx -y @kerinlin/zentao-mcp-server
 }
 ```
 
-修改配置后请**完全重启 Cursor**。也可将 `args` 中的包名改为固定版本，例如 `@kerinlin/zentao-mcp-server@1.0.1`。
+修改配置后请**完全重启 Cursor**。也可将 `args` 中的包名改为固定版本，例如 `@kerin/zentao-mcp-server@1.1.1`。
 
 ### 2.3 维护者：发布到 npm
 
