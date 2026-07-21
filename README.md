@@ -26,7 +26,43 @@ cp .env.example .env
 
 ## 2. 安装方式
 
-### 2.1 无需 Node 环境（推荐最终用户）
+### 2.0 一键安装（推荐）
+
+**macOS / Linux**（无需 Node；优先下载预编译二进制，失败再回退 npm）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kerinlin/zentao-mcp-server/main/scripts/install.sh | bash
+```
+
+常用选项：
+
+```bash
+# 指定版本 / 安装前缀 / 强制覆盖
+curl -fsSL https://raw.githubusercontent.com/Kerinlin/zentao-mcp-server/main/scripts/install.sh | bash -s -- --version v1.1.2 --prefix ~/.local --force
+
+# 仅二进制 / 仅 npm
+bash scripts/install.sh --method binary
+bash scripts/install.sh --method npm
+```
+
+默认安装到 `~/.local/bin/zentao-mcp-server`。若该目录不在 `PATH`，脚本会提示你补上。
+
+**Windows（PowerShell）**：
+
+```powershell
+irm https://raw.githubusercontent.com/Kerinlin/zentao-mcp-server/main/scripts/install.ps1 | iex
+```
+
+```powershell
+# 指定版本 / 前缀 / 强制覆盖
+.\scripts\install.ps1 -Version v1.1.2 -Prefix "$env:LOCALAPPDATA\zentao-mcp" -Force
+```
+
+默认安装到 `%LOCALAPPDATA%\zentao-mcp\bin\zentao-mcp-server.exe`。
+
+安装成功后脚本会打印 MCP 配置示例；把 `command` 改成输出的绝对路径即可。
+
+### 2.1 无需 Node 环境（手动下载）
 
 下载预编译二进制，**无需安装 Node.js**：
 
