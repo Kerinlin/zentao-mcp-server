@@ -22,7 +22,9 @@
     "start:stdio": "tsx src/server/stdio.ts",
     "start:http": "tsx src/server/http.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "release:tag": "bash scripts/release-tag.sh",
+    "release:tag:push": "bash scripts/release-tag.sh --push-branch --watch"
   },
   "keywords": [
     "mcp",

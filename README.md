@@ -190,6 +190,23 @@ ls -lh dist/zentao-mcp-server-*
 
 **GitHub Actions 自动构建**：推送 `v*` tag 时会自动构建并上传到 Release。
 
+一键打 tag 并推送（触发二进制构建）：
+
+```bash
+# 用 package.json 的 version 打 vX.Y.Z 并 push tag
+npm run release:tag
+
+# 先推当前分支，再打 tag，并 watch Actions
+npm run release:tag:push
+
+# 预览 / 覆盖已有 tag / 指定版本
+bash scripts/release-tag.sh --dry-run
+bash scripts/release-tag.sh --force
+bash scripts/release-tag.sh v1.1.3 --push-branch --watch
+```
+
+> 若 Release 上传 403：仓库 Settings → Actions → General → Workflow permissions 选 **Read and write**；workflow 需含 `permissions: contents: write`。
+
 源码仓库：<https://github.com/Kerinlin/zentao-mcp-server>
 
 ## 3. 启动方式
