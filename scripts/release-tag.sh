@@ -115,8 +115,8 @@ fi
 
 # 工作区干净（允许 untracked，如 __pycache__）
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
-  err "有未提交的修改，请先 commit 或 stash：
-$(git status --short --untracked-files=no)"
+  dirty="$(git status --short --untracked-files=no)"
+  err "有未提交的修改，请先 commit 或 stash：${dirty}"
 fi
 
 # 版本
@@ -160,26 +160,27 @@ log "说明:   $MESSAGE"
 log "选项:   dry-run=$DRY_RUN force=$FORCE push-branch=$PUSH_BRANCH watch=$WATCH"
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# 本地/远程是否已有 tag
+# 本地/远程是否已有 tag（避免 set -u 下多行字符串/管道退出码踩坑）
 local_tag_exists=0
 remote_tag_exists=0
 if git rev-parse "$tag" >/dev/null 2>&1; then
   local_tag_exists=1
 fi
-if git ls-remote --tags "$REMOTE" "refs/tags/${tag}" | grep -q .; then
+# ls-remote 有输出则远程已存在；不用 grep -q + pipefail 组合
+remote_ref="$(git ls-remote --tags "$REMOTE" "refs/tags/${tag}" 2>/dev/null || true)"
+if [[ -n "${remote_ref}" ]]; then
   remote_tag_exists=1
 fi
 
-if [[ $local_tag_exists -eq 1 || $remote_tag_exists -eq 1 ]]; then
-  if [[ $FORCE -eq 0 ]]; then
-    err "Tag ${tag} 已存在（local=$local_tag_exists remote=$remote_tag_exists）。
-用 --force 删除并重建，或换更高版本号。"
+if [[ "${local_tag_exists}" -eq 1 || "${remote_tag_exists}" -eq 1 ]]; then
+  if [[ "${FORCE}" -eq 0 ]]; then
+    err "Tag ${tag} 已存在 (local=${local_tag_exists} remote=${remote_tag_exists})。请加 --force 删除并重建，或换更高版本号。"
   fi
-  warn "将删除已存在的 tag: $tag"
-  if [[ $local_tag_exists -eq 1 ]]; then
+  warn "将删除已存在的 tag: ${tag}"
+  if [[ "${local_tag_exists}" -eq 1 ]]; then
     run "git tag -d $(printf %q "$tag")"
   fi
-  if [[ $remote_tag_exists -eq 1 ]]; then
+  if [[ "${remote_tag_exists}" -eq 1 ]]; then
     run "git push $(printf %q "$REMOTE") :refs/tags/$(printf %q "$tag")"
   fi
 fi
